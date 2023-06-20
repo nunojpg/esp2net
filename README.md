@@ -2,6 +2,8 @@
 
 Does the same as https://github.com/espressif/esptool/blob/master/esp_rfc2217_server.py, but in a very small binary, mostly for OpenWRT routers.
 
+**This tools is now available as a package on OpenWRT!**
+
 ## Quick start
 
 ```
