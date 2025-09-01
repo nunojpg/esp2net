@@ -66,6 +66,9 @@ void Telnet::AcceptLoop()
         if (ec) throw asio::system_error(ec);
         std::cout << "Telnet connection from " << m_socket.remote_endpoint() << '\n';
         // open on first telnet connection
+        m_rts = false;
+        m_dtr = false;
+        m_got_reset = false;
         m_uart->Open();
         ReceiveLoop();
     });
@@ -89,6 +92,23 @@ void Telnet::ReceiveLoop()
         ReceiveLoop();
     });
 }
+void Telnet::BootMode()
+{
+    if (m_dtr == 1 && m_rts == 0) {
+        m_got_reset = true;
+        m_uart->ESP32EnterBootMode(uart::ESP32BootMode::Reset);
+    }
+    if (m_got_reset) {
+        if (m_dtr == 1 && m_rts == 1) {
+            m_uart->ESP32EnterBootMode(uart::ESP32BootMode::Normal);
+            m_got_reset = false;
+        }
+        if (m_dtr == 0 && m_rts == 1) {
+            m_uart->ESP32EnterBootMode(uart::ESP32BootMode::Bootloader);
+            m_got_reset = false;
+        }
+    }
+}
 void Telnet::ParseCmd()
 {
     auto rfc2217 = [this](const std::span<const uint8_t> cmd) {
@@ -98,15 +118,21 @@ void Telnet::ParseCmd()
         } else if (cmd[0] == 2 && cmd.size() == 2) {  // SET-DATASIZE
         } else if (cmd[0] == 3 && cmd.size() == 2) {  // SET-PARITY
         } else if (cmd[0] == 4 && cmd.size() == 2) {  // SET-STOPSIZE
-        } else if (cmd[0] == 5 && cmd.size() == 2) {
+        } else if (cmd[0] == 5 && cmd.size() == 2) {  // SET_CONTROL
             auto c = cmd[1];
             if (c == 1) {
-            } else if (c == 8) {
-                m_uart->ESP32EnterBootMode(uart::ESP32BootMode::Bootloader);
-            } else if (c == 9) {
-            } else if (c == 11) {
-                m_uart->ESP32EnterBootMode(uart::ESP32BootMode::Reset);
-            } else if (c == 12) {
+            } else if (c == 8) {  // DTR ON
+                m_dtr = 0;
+                BootMode();
+            } else if (c == 9) {  // DTR OFF
+                m_dtr = 1;
+                BootMode();
+            } else if (c == 11) {  // RTS ON
+                m_rts = 0;
+                BootMode();
+            } else if (c == 12) {  // RTS OFF
+                m_rts = 1;
+                BootMode();
             } else {
             }
         } else if (cmd[0] == 12 && cmd.size() == 2) {  // PURGE-DATA
@@ -125,7 +151,7 @@ void Telnet::ParseCmd()
         if (OPT == 1) {
             // this is the first message received by idf.py, and we need to send
             // also a single message, so do it here. in case of a raw tcp connection
-            // we don't send this message to avoid some trash on scre
+            // we don't send this message to avoid some trash on screen
             std::error_code ec;
             uint8_t answer[] = {std::to_underlying(TelnetCmd::IAC),
                                 std::to_underlying(TelnetCmd::DO), 44};

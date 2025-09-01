@@ -22,12 +22,16 @@ private:
     void ReceiveLoop();
     void Parse(std::span<const uint8_t> cmd);
     void ParseCmd();
+    void BootMode();
 
     asio::io_context &m_io_context;
     asio::ip::tcp::acceptor m_acceptor;
     asio::ip::tcp::socket m_socket{m_io_context};
     uint8_t m_buffer[128];
     bool m_escape;
+    bool m_rts;
+    bool m_dtr;
+    bool m_got_reset;
     std::vector<uint8_t> m_cmd;
     uart::UART *m_uart;
 };

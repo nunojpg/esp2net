@@ -41,12 +41,12 @@ void UART::SetBaud(uint32_t baud)
 void UART::SetRTS(bool enabled)
 {
     int data = TIOCM_RTS;
-    if (ioctl(m_serial_port.native_handle(), enabled ? TIOCMBIS : TIOCMBIC, &data)) throw;
+    if (ioctl(m_serial_port.native_handle(), enabled ? TIOCMBIC : TIOCMBIS, &data)) throw;
 }
 void UART::SetDTR(bool enabled)
 {
     int data = TIOCM_DTR;
-    if (ioctl(m_serial_port.native_handle(), enabled ? TIOCMBIS : TIOCMBIC, &data)) throw;
+    if (ioctl(m_serial_port.native_handle(), enabled ? TIOCMBIC : TIOCMBIS, &data)) throw;
 }
 void UART::SetReceiveCallback(telnet::Telnet *telnet) { m_callback = telnet; }
 void UART::ReceiveLoop()

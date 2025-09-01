@@ -24,17 +24,26 @@ public:
     void ESP32EnterBootMode(ESP32BootMode mode)
     {
         /*
-        DTR RTS EN BOOT
-        1   1   1  1     Normal
-        0   0   1  1     Normal (*)
-        1   0   0  1     Reset
-        0   1   1  0     Bootloader
-
-        (*) Mode due to Espressif DevKit board autodownload circuit to avoid reset
-        when plugging USB in some OS
+        The following sequences work both with:
+        - Native RTS/DTR connection to EN/BOOT (or bridge chip)
+        - USB-Serial/JTAG port.
         */
-        SetDTR(mode == ESP32BootMode::Bootloader);
-        SetRTS(mode == ESP32BootMode::Reset);
+        if (mode == ESP32BootMode::Normal) {
+            SetRTS(true);
+            SetDTR(true);
+        } else if (mode == ESP32BootMode::Bootloader) {
+            SetRTS(true);
+            SetDTR(false);
+            SetRTS(false);
+            SetDTR(true);  // USB-Serial/JTAG in download mode, Native disabled
+
+            SetDTR(false);
+            SetRTS(true);  // USB-Serial/JTAG in download mode, Native in download mode
+        } else if (mode == ESP32BootMode::Reset) {
+            SetDTR(true);
+            SetRTS(true);
+            SetRTS(false);  // USB-Serial/JTAG port reset, Native disabled
+        }
     }
 
 private:
