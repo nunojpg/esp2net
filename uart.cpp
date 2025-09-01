@@ -1,6 +1,7 @@
 #include "uart.hpp"
 
 #include <iostream>
+#include <thread>
 
 #include <asio/ts/buffer.hpp>
 
@@ -28,8 +29,23 @@ void UART::Open()
 }
 void UART::Send(std::span<const uint8_t> bytes)
 {
-    std::error_code ec;
-    asio::write(m_serial_port, asio::buffer(bytes), ec);
+    /*
+    ESP USB will block if nothing is being read on the application side. ASIO does not support
+    synchronous non-blocking writes (see sync_write1, where blocking behaviour is configured by
+    user_set_non_blocking, which can't be set for serial ports) There are two supported scenarios:
+    - Flashing - we want to block until all data is written, so we wait up to 1s to flush all data.
+    - Non-flashing - we typically would block because of inadvertent console inputs. In this case we
+    wait 1s and drop the data.
+    */
+    for (int i = 0; i < 100; ++i) {
+        auto ret = write(m_serial_port.native_handle(), bytes.data(), bytes.size());
+        if (ret == bytes.size()) return;
+        if (ret > 0) {
+            bytes = bytes.subspan(ret);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::cerr << "Serial port write buffer full, bytes dropped\n";
 }
 void UART::SetBaud(uint32_t baud)
 {
